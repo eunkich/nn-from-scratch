@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "naive_blas.hpp"
 
 std::vector<std::vector<float>> read_csv()
 {
@@ -54,19 +55,37 @@ void save_bin(int n, int m, std::vector<std::vector<float>> &data)
     data.clear();
 }
 
+template <typename T>
+void print_vector(std::vector<T> vec)
+{
+    std::cout << "[";
+    for (auto e : vec)
+    {
+        std::cout << e << ", ";
+    }
+    std::cout << "\b\b]\n";
+}
+
 int main()
 {
     // Read
-    std::ifstream input("data/train.bin", std::ios::binary);
-    const int n = 60000, m = 785;
-    if (!input)
-    {
-        std::vector<std::vector<float>> data = read_csv();
-        save_bin(n, m, data);
-    }
+    // std::ifstream input("data/train.bin", std::ios::binary);
+    // const int n = 60000, m = 785;
+    // if (!input)
+    // {
+    //     std::vector<std::vector<float>> data = read_csv();
+    //     save_bin(n, m, data);
+    // }
 
-    std::vector<float> matrix_read(n * m);
-    input.read(reinterpret_cast<char *>(matrix_read.data()), sizeof(float) * n * m);
-    std::cout << "shape: (" << n << ", " << m << ") size:"
-              << matrix_read.size() << " \n";
+    // std::vector<float> matrix_read(n * m);
+    // input.read(reinterpret_cast<char *>(matrix_read.data()), sizeof(float) * n * m);
+    // std::cout << "shape: (" << n << ", " << m << ") size:"
+    //           << matrix_read.size() << " \n";
+
+    float a = 1.f;
+    std::vector<float> x = {1.f, 2.f};
+    std::vector<float> y = {2.f, 1.f};
+    std::cout << sdot(x, y);
+    axpy(a, x, y);
+    print_vector(y);
 }
