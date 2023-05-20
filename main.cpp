@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -66,26 +67,52 @@ void print_vector(std::vector<T> vec)
     std::cout << "\b\b]\n";
 }
 
-int main()
+void read_bin(const int &n, const int &m, std::vector<float> &out)
 {
     // Read
-    // std::ifstream input("data/train.bin", std::ios::binary);
-    // const int n = 60000, m = 785;
-    // if (!input)
-    // {
-    //     std::vector<std::vector<float>> data = read_csv();
-    //     save_bin(n, m, data);
-    // }
+    std::ifstream input("data/train.bin", std::ios::binary);
+    if (!input)
+    {
+        std::vector<std::vector<float>> tmp = read_csv();
+        save_bin(n, m, tmp);
+    }
 
-    // std::vector<float> matrix_read(n * m);
-    // input.read(reinterpret_cast<char *>(matrix_read.data()), sizeof(float) * n * m);
-    // std::cout << "shape: (" << n << ", " << m << ") size:"
-    //           << matrix_read.size() << " \n";
+    input.read(reinterpret_cast<char *>(out.data()), sizeof(float) * n * m);
+}
 
-    float a = 1.f;
-    std::vector<float> x = {1.f, 2.f};
-    std::vector<float> y = {2.f, 1.f};
-    std::cout << sdot(x, y);
-    axpy(a, x, y);
-    print_vector(y);
+void print_digit(std::vector<float> &sample)
+{
+    std::cout << "label: " << sample[0] << "\n";
+    for (int i = 0; i < 28; i++)
+    {
+        for (int j = 0; j < 28; j++)
+        {
+            std::cout << std::setw(3) << sample[1 + j + i * 28] << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+int main()
+{
+    // Read train data in column major order
+    const int n = 60000, m = 785;
+    std::vector<std::vector<float>> samples(n, std::vector<float>(m, 0));
+    {
+        std::vector<float> data(n * m);
+        read_bin(n, m, data);
+        std::cout << "shape: (" << n << ", " << m << ") size:"
+                  << data.size() << " \n";
+        for (int i; i < n; i++)
+        {
+            for (int j; j < m; j++)
+            {
+                samples[i][j] = data[i + j * n];
+            }
+        }
+    }
+    for (int i = 0; i < 10; i++)
+    {
+        print_digit(samples[i]);
+    }
 }
