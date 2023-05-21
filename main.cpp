@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <math.h>
 #include "naive_blas.hpp"
 
 std::vector<std::vector<float>> read_csv()
@@ -93,6 +95,18 @@ void print_digit(std::vector<float> &sample)
     }
 }
 
+float log_softmax(int i, std::vector<float> z)
+{
+    const int n = z.size();
+    float expsum = 0;
+    for (int i = 0; i < n; i++)
+    {
+        expsum += exp(z[i]);
+    }
+
+    return z[i] - log(expsum);
+}
+
 int main()
 {
     // Read train data in column major order
@@ -103,16 +117,35 @@ int main()
         read_bin(n, m, data);
         std::cout << "shape: (" << n << ", " << m << ") size:"
                   << data.size() << " \n";
-        for (int i; i < n; i++)
+        for (int i = 0; i < n; i++)
         {
-            for (int j; j < m; j++)
+            for (int j = 0; j < m; j++)
             {
                 samples[i][j] = data[i + j * n];
             }
         }
     }
+
+    // head
     for (int i = 0; i < 10; i++)
     {
         print_digit(samples[i]);
+    }
+
+    // extract labels and replace it with 1 to use it for bias
+    // samples[i]: [y, x...x] -> [1, x...x]
+    // y[i]: label for samples[i]
+    std::vector<float> y(n, 1);
+    for (int i = 0; i < n; i++)
+    {
+        std::swap(y[i], samples[i][0]);
+    }
+
+    // check op
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << y[i] << " ";
+        print_vector(samples[i]);
+        std::cout << "\n";
     }
 }
