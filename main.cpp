@@ -1,11 +1,12 @@
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <math.h>
+#include <iostream>  // std::cout
+#include <iomanip>   // std::setw
+#include <fstream>   // std::ifstream
+#include <sstream>   // std::stringstream
+#include <string>    // std::string
+#include <vector>    // std::vector
+#include <random>    // std::random_device, std::mt19337_64, std::normal_distribution
+#include <algorithm> // std::swap
+#include <math.h>    // log, sqrt
 #include "naive_blas.hpp"
 
 std::vector<std::vector<float>> read_csv()
@@ -107,45 +108,91 @@ float log_softmax(int i, std::vector<float> z)
     return z[i] - log(expsum);
 }
 
-int main()
+void load_data(int n, int m, std::vector<std::vector<float>> &samples)
 {
-    // Read train data in column major order
-    const int n = 60000, m = 785;
-    std::vector<std::vector<float>> samples(n, std::vector<float>(m, 0));
+    std::vector<float> data(60000 * 785);
+    read_bin(60000, 785, data);
+    for (int i = 0; i < n; i++)
     {
-        std::vector<float> data(n * m);
-        read_bin(n, m, data);
-        std::cout << "shape: (" << n << ", " << m << ") size:"
-                  << data.size() << " \n";
-        for (int i = 0; i < n; i++)
+        for (int j = 0; j < 785; j++)
         {
-            for (int j = 0; j < m; j++)
-            {
-                samples[i][j] = data[i + j * n];
-            }
+            samples[i][j] = data[i + j * 60000];
         }
     }
+}
 
-    // head
-    for (int i = 0; i < 10; i++)
-    {
-        print_digit(samples[i]);
-    }
-
-    // extract labels and replace it with 1 to use it for bias
-    // samples[i]: [y, x...x] -> [1, x...x]
-    // y[i]: label for samples[i]
-    std::vector<float> y(n, 1);
-    for (int i = 0; i < n; i++)
+// extract labels and replace it with 1 to use it for bias
+// samples[i]: [y, x...x] -> [1, x...x]
+// y[i]: label for samples[i]
+std::vector<float> extract_label(std::vector<std::vector<float>> &samples)
+{
+    std::vector<float> y(samples.size(), 1);
+    for (int i = 0; i < y.size(); i++)
     {
         std::swap(y[i], samples[i][0]);
     }
+    return y;
+}
 
-    // check op
-    for (int i = 0; i < 10; i++)
+class Network
+{
+public:
+    int dim_in;
+    int dim_out;
+    std::vector<std::vector<float>> weights;
+    Network(int input_dim, int output_dim) : dim_in(input_dim), dim_out(output_dim), weights()
     {
-        std::cout << y[i] << " ";
-        print_vector(samples[i]);
-        std::cout << "\n";
+        weights.resize(dim_out);
+        for (int i = 0; i < dim_out; i++)
+        {
+            weights[i].resize(dim_in + 1); // include bias
+        }
+
+        std::cout << "W shape(" << weights.size() << ", " << weights[0].size() << ")\n";
     }
+
+    void xavier_init()
+    {
+        int seed;
+        std::random_device rd;
+        std::mt19937_64 rng;
+        seed = rd();
+        rng.seed(seed);
+        float var = sqrt(2.f / static_cast<float>(dim_in + dim_out));
+        std::normal_distribution<float> dist(0.f, var);
+
+        for (int i = 0; i < weights.size(); i++)
+        {
+            for (int j = 0; j < weights[0].size(); j++)
+            {
+                weights[i][j] = dist(rng);
+            }
+        }
+    }
+};
+
+int main()
+{
+    // Read train data in column major order
+    const int n = 1000, m = 785;
+    std::vector<std::vector<float>> samples(n, std::vector<float>(m, 0));
+    load_data(n, m, samples);
+
+    std::cout << "sample shape: ("
+              << samples.size() << ", "
+              << samples[0].size() << ")\n";
+
+    // head
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     print_digit(samples[i]);
+    // }
+
+    std::vector<float> y = extract_label(samples);
+    // print_vector(y);
+
+    Network net(784, 10);
+    net.xavier_init();
+    // print_vector(net.weights[0]);
+    // std::cout << net.weights.size() << net.weights[0].size() << std::endl;
 }
