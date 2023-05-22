@@ -1,13 +1,13 @@
-#include <iostream>  // std::cout
-#include <iomanip>   // std::setw
-#include <fstream>   // std::ifstream
-#include <sstream>   // std::stringstream
-#include <string>    // std::string
-#include <vector>    // std::vector
-#include <random>    // std::random_device, std::mt19337_64, std::normal_distribution
-#include <algorithm> // std::swap
-#include <math.h>    // log, sqrt
-#include "naive_blas.hpp"
+#include <iostream>       // std::cout
+#include <iomanip>        // std::setw
+#include <fstream>        // std::ifstream
+#include <sstream>        // std::stringstream
+#include <string>         // std::string
+#include <vector>         // std::vector
+#include <random>         // std::random_device, std::mt19337_64, std::normal_distribution
+#include <algorithm>      // std::swap
+#include <math.h>         // log, sqrt
+#include "naive_blas.hpp" // gemv
 
 std::vector<std::vector<float>> read_csv()
 {
@@ -116,7 +116,7 @@ void load_data(int n, int m, std::vector<std::vector<float>> &samples)
     {
         for (int j = 0; j < 785; j++)
         {
-            samples[i][j] = data[i + j * 60000];
+            samples[i][j] = data[i + j * 60000] / 255;
         }
     }
 }
@@ -169,6 +169,13 @@ public:
             }
         }
     }
+
+    std::vector<float> forward(std::vector<float> x)
+    {
+        std::vector<float> y(dim_out, 0.f);
+        gemv(1.f, weights, x, 0.f, y);
+        return y;
+    }
 };
 
 int main()
@@ -193,6 +200,9 @@ int main()
 
     Network net(784, 10);
     net.xavier_init();
-    // print_vector(net.weights[0]);
+    std::vector<float> out = net.forward(samples[0]);
+    print_vector(out);
+    float loss = log_softmax(y[0], out);
+    std::cout << loss << "\n";
     // std::cout << net.weights.size() << net.weights[0].size() << std::endl;
 }
