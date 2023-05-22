@@ -59,12 +59,12 @@ template <typename T>
 void gemv(T a, const std::vector<std::vector<T>> &A,
           const std::vector<T> &x, T b, std::vector<T> &y)
 {
-    if (x.size() != A.size())
+    if (x.size() != A[0].size())
     {
         std::cerr << "Error: matrix A(m x n) and vector x(n x 1) have different sizes" << std::endl;
         return;
     }
-    if (y.size() != A[0].size())
+    if (y.size() != A.size())
     {
         std::cerr << "Error: matrix Ax(m x 1) and vector y(m x 1) have different sizes" << std::endl;
         return;
