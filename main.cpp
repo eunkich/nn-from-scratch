@@ -142,24 +142,6 @@ void print_digit(std::vector<float> &sample)
 }
 
 // operations
-std::vector<float> log_softmax(std::vector<float> x)
-{
-    std::vector<float> out(x.size(), 0);
-    const int n = x.size();
-    float expsum = 0;
-    for (int i = 0; i < n; i++)
-    {
-        expsum += exp(x[i]);
-    }
-
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = x[i] - log(expsum);
-    }
-
-    return out;
-}
-
 std::vector<float> softmax(std::vector<float> x)
 {
     std::vector<float> out(x.size(), 0);
@@ -190,18 +172,6 @@ float cross_entropy(std::vector<float> x, std::vector<float> y)
     return out;
 }
 
-std::vector<float> grad_z_L(std::vector<float> s, std::vector<float> y)
-{
-    std::vector<float> out(y.size(), 0);
-    for (int i = 0; i < out.size(); i++)
-    {
-        out[i] = s[i] - y[i];
-    }
-
-    return out;
-}
-
-// max(0, x) elementwise
 void relu(std::vector<float> &x)
 {
     for (int i = 0; i < x.size(); i++)
@@ -234,8 +204,8 @@ public:
     int dim_out;
     std::vector<float> _x;
     std::vector<std::vector<float>> W;
-    std::vector<float> _a;
     std::vector<float> _z;
+    std::vector<float> _a;
 
     Network(int input_dim, int output_dim) : dim_in(input_dim), dim_out(output_dim), W()
     {
@@ -272,25 +242,29 @@ public:
         std::vector<float> out(dim_out, 0.f);
         _x = x;
         gemv(1.f, W, x, 0.f, out);
-        _a = out;
-        out = softmax(out);
         _z = out;
+        out = softmax(out);
+        _a = out;
 
         return out;
     }
 
-    std::vector<std::vector<float>> backward(std::vector<float> grad)
+    std::vector<std::vector<float>> backward(std::vector<float> a, std::vector<float> y)
     {
-        std::vector<std::vector<float>> _grad(10, std::vector<float>(785, 0));
-        for (int i = 0; i < grad.size(); i++)
+        std::vector<float> dz;
+        axpy(-1.f, y, a);
+        dz = a;
+
+        std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0));
+        for (int i = 0; i < dz.size(); i++)
         {
             for (int j = 0; j < _x.size(); j++)
             {
-                _grad[i][j] = grad[i] * _x[j];
+                dW[i][j] = dz[i] * _x[j];
             }
         }
 
-        return _grad;
+        return dW;
     }
 };
 
@@ -305,18 +279,7 @@ int main()
               << samples.size() << ", "
               << samples[0].size() << ")\n";
 
-    // head
-    // for (int i = 0; i < 10; i++)
-    // {
-    //     print_digit(samples[i]);
-    // }
-
-    // std::cout << y[0] << " ";
     std::vector<float> y = extract_label(samples);
-    std::vector<float> y_0 = onehot_encode(y[0]);
-    // print_vector(y_0);
-
-    // print_vector(y);
 
     std::vector<std::vector<float>> I(10, std::vector<float>(10, 0.f));
     for (int i = 0; i < 10; i++)
@@ -327,34 +290,40 @@ int main()
     Network net(784, 10);
     net.xavier_init();
 
-    const int MINI_BATCH_SIZE = 1000;
-    std::vector<float> out, grad, y_i, x_i;
-    std::vector<std::vector<float>> _grad;
+    const int BATCH_SIZE = 64;
+    const int NUM_BATCH = samples.size() / BATCH_SIZE;
+    std::vector<float> out, y_i, x_i;
+    std::vector<std::vector<float>> dW;
     float loss, loss_mean;
-    float lr = 0.005;
+    float lr = 0.01f;
 
     int sp = 0, idx = 0;
-    for (int b = 0; b < 10; b++)
+
+    for (int epoch = 0; epoch < 10; epoch++)
     {
-        loss_mean = 0;
-        std::vector<std::vector<float>> _grad_mean(10, std::vector<float>(785, 0));
-
-        for (int i = 0; i < MINI_BATCH_SIZE; i++)
+        float loss_epoch_mean = 0;
+        for (int b = 0; b < NUM_BATCH; b++)
         {
-            idx = b * MINI_BATCH_SIZE + i;
-            y_i = onehot_encode(y[idx]);
-            x_i = samples[idx];
-            out = net.forward(x_i);
-            loss = cross_entropy(out, y_i);
-            loss_mean += loss;
+            std::vector<std::vector<float>> _grad_sum(10, std::vector<float>(785, 0));
+            float loss_batch_mean = 0;
+            for (int i = 0; i < BATCH_SIZE; i++)
+            {
+                idx = b * BATCH_SIZE + i;
+                y_i = onehot_encode(y[idx]);
+                x_i = samples[idx];
+                out = net.forward(x_i);
+                loss = cross_entropy(out, y_i);
+                loss_batch_mean += loss;
+                dW = net.backward(out, y_i);
+                gemm(1.f, I, dW, 1.f, _grad_sum);
+            }
 
-            grad = grad_z_L(out, y_i);
-            _grad = net.backward(grad);
-            gemm(1.f / MINI_BATCH_SIZE, I, _grad, 1.f, _grad_mean);
+            loss_batch_mean /= BATCH_SIZE;
+            loss_epoch_mean += loss_batch_mean;
+            gemm(-lr / BATCH_SIZE, I, _grad_sum, 1.f, net.W);
         }
-
-        loss_mean /= MINI_BATCH_SIZE;
-        gemm(lr, I, _grad_mean, 1.f, net.W);
-        std::cout << "mean loss: " << loss_mean << std::endl;
+        loss_epoch_mean /= NUM_BATCH;
+        std::cout << "epoch: " << epoch + 1 << "/10 "
+                  << "mean loss: " << loss_epoch_mean << std::endl;
     }
 }
