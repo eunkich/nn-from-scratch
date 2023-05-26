@@ -7,10 +7,10 @@
 #include <algorithm> // std::swap
 
 // dataloader
-std::vector<std::vector<float>> read_csv()
+std::vector<std::vector<float>> read_csv(std::string &path)
 {
     std::string line;
-    std::ifstream myfile("data/mnist_train.csv");
+    std::ifstream myfile(path);
     std::vector<std::vector<float>> data;
     if (myfile.is_open())
     {
@@ -32,7 +32,7 @@ std::vector<std::vector<float>> read_csv()
     return data;
 }
 
-void save_bin(int n, int m, std::vector<std::vector<float>> &data)
+void save_bin(int n, int m, std::vector<std::vector<float>> &data, std::string &path)
 {
     std::vector<float> out;
     for (int j = 0; j < m; j++)
@@ -43,7 +43,7 @@ void save_bin(int n, int m, std::vector<std::vector<float>> &data)
         }
     }
 
-    std::ofstream outfile("data/train.bin", std::ios::out | std::ios::binary);
+    std::ofstream outfile(path, std::ios::out | std::ios::binary);
     if (outfile.is_open())
     {
         outfile.write(reinterpret_cast<const char *>(out.data()), sizeof(float) * n * m);
@@ -51,34 +51,38 @@ void save_bin(int n, int m, std::vector<std::vector<float>> &data)
     }
     else
     {
-        std::cerr << "Failed to open file: data/train.bin" << std::endl;
+        std::cerr << "Failed to open file: " << path << std::endl;
         throw 1;
     }
     data.clear();
 }
 
-void read_bin(const int &n, const int &m, std::vector<float> &out)
+void read_bin(const int &n, const int &m, std::vector<float> &out, std::string &path)
 {
     // Read
-    std::ifstream input("data/train.bin", std::ios::binary);
+    std::ifstream input(path, std::ios::binary);
     if (!input)
     {
-        std::vector<std::vector<float>> tmp = read_csv();
-        save_bin(n, m, tmp);
+        auto pos = path.find_last_of('.');
+        auto csv_path = path.substr(0, pos) + ".csv";
+        std::vector<std::vector<float>> tmp = read_csv(csv_path);
+        save_bin(n, m, tmp, path);
+        input = std::ifstream(path, std::ios::binary);
     }
 
     input.read(reinterpret_cast<char *>(out.data()), sizeof(float) * n * m);
 }
 
-void load_data(int n, int m, std::vector<std::vector<float>> &samples)
+void load_data(int n, int m, std::vector<std::vector<float>> &samples, std::string path)
 {
-    std::vector<float> data(60000 * 785);
-    read_bin(60000, 785, data);
+    std::vector<float> data(n * m);
+    read_bin(n, m, data, path);
+
     for (int i = 0; i < n; i++)
     {
-        for (int j = 0; j < 785; j++)
+        for (int j = 0; j < m; j++)
         {
-            samples[i][j] = data[i + j * 60000];
+            samples[i][j] = data[i + j * n];
             if (j > 0)
             {
                 samples[i][j] /= 255;
@@ -131,7 +135,7 @@ void print_vector(std::vector<T> vec)
 
 void print_digit(std::vector<float> &sample)
 {
-    std::cout << "label: " << sample[0] << "\n";
+    // std::cout << "label: " << sample[0] << "\n";
     for (int i = 0; i < 28; i++)
     {
         for (int j = 0; j < 28; j++)

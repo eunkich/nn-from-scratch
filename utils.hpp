@@ -9,7 +9,7 @@ void save_bin(int n, int m, std::vector<std::vector<float>> &data);
 
 void read_bin(const int &n, const int &m, std::vector<float> &out);
 
-void load_data(int n, int m, std::vector<std::vector<float>> &samples);
+void load_data(int n, int m, std::vector<std::vector<float>> &samples, std::string path);
 
 std::vector<std::vector<float>> extract_label(std::vector<std::vector<float>> &samples);
 

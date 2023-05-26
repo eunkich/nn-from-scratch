@@ -66,7 +66,7 @@ if __name__ == "__main__":
                 mean_acc += np.sum(pred == trg) / batch_size
             W -= lr / batch_size * dW_sum
 
-        print(f'Epoch {epoch+1}')
+        print(f'Epoch: {epoch+1}')
         print(f'Train/loss    : {mean_loss / num_batch:.4f}')
         print(f'Train/accuracy: {mean_acc / num_batch:.4f}')
 
