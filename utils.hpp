@@ -11,7 +11,7 @@ void read_bin(const int &n, const int &m, std::vector<float> &out);
 
 void load_data(int n, int m, std::vector<std::vector<float>> &samples);
 
-std::vector<float> extract_label(std::vector<std::vector<float>> &samples);
+std::vector<std::vector<float>> extract_label(std::vector<std::vector<float>> &samples);
 
 std::vector<float> onehot_encode(int y);
 

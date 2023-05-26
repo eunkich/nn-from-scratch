@@ -11,10 +11,10 @@ def cross_entropy(x, y):
     return -np.sum(y * np.log(x))
 
 
-def forward(x, W):
+def forward(W, x):
     z = W @ x
     a = softmax(z)
-    return z, a
+    return a
 
 
 def backward(x, y, a):
@@ -57,7 +57,7 @@ if __name__ == "__main__":
                 idx = b * batch_size + i
                 x = train_X[idx]
                 y = train_y[idx]
-                z, a = forward(x, W)
+                a = forward(W, x)
 
                 dW_sum += backward(x, y, a)
                 mean_loss += cross_entropy(a, y) / batch_size
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         for i in range(len(test_X)):
             x = test_X[i]
             y = test_y[i]
-            _, a = forward(x, W)
+            a = forward(W, x)
 
             pred = np.argmax(a)
             trg = np.argmax(y)

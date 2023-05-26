@@ -104,13 +104,14 @@ void xavier_init(std::vector<std::vector<float>> &W)
     }
 }
 
-void forward(std::vector<std::vector<float>> W,
-             std::vector<float> x,
-             std::vector<float> &z,
-             std::vector<float> &a)
+std::vector<float> forward(std::vector<std::vector<float>> W,
+                           std::vector<float> x)
 {
+    std::vector<float> z(10, 0);
     gemv(1.f, W, x, 0.f, z);
-    a = softmax(z);
+    std::vector<float> a = softmax(z);
+
+    return a;
 }
 
 std::vector<std::vector<float>> backward(std::vector<float> x,
@@ -120,13 +121,22 @@ std::vector<std::vector<float>> backward(std::vector<float> x,
     std::vector<float> dz = a;
     axpy(-1.f, y, dz);
     std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0.f));
-    for (int i = 0; i < dz.size(); i++)
+    std::vector<std::vector<float>> dZ(10, std::vector<float>(1, 0.f));
+    std::vector<std::vector<float>> X(1, std::vector<float>(785, 0.f));
+
+    // expand_dims dz(10,) -> dZ(10, 1)
+    for (int i = 0; i < 10; i++)
     {
-        for (int j = 0; j < x.size(); j++)
-        {
-            dW[i][j] = dz[i] * x[j];
-        }
+        dZ[i][0] = dz[i];
     }
+
+    // expand_dims x(785,) -> dZ(1, 785)
+    for (int i = 0; i < 785; i++)
+    {
+        X[0][i] = x[i];
+    }
+
+    gemm(1.f, dZ, X, 0.f, dW);
 
     return dW;
 }
@@ -142,8 +152,9 @@ int main()
               << train_X.size() << ", "
               << train_X[0].size() << ")\n";
 
-    std::vector<float> train_y = extract_label(train_X);
+    std::vector<std::vector<float>> train_y = extract_label(train_X);
 
+    // 10x10 Identity matrix
     std::vector<std::vector<float>> I(10, std::vector<float>(10, 0.f));
     for (int i = 0; i < 10; i++)
     {
@@ -153,15 +164,13 @@ int main()
     std::vector<std::vector<float>> W(10, std::vector<float>(785, 0.f));
     xavier_init(W);
 
-    std::vector<float> z(W.size(), 0.f);
-    std::vector<float> a(W.size(), 0.f);
+    int pred, trg;
     const int BATCH_SIZE = 64;
     const int NUM_BATCH = train_X.size() / BATCH_SIZE;
-    const float lr = 0.01f;
-    std::vector<float> out, x, y;
-    std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0.f));
+    const float LR = 0.01f;
     float mean_loss, mean_acc;
-    int pred, trg;
+    std::vector<float> x, y, a;
+    std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0.f));
 
     int idx = 0;
     for (int epoch = 0; epoch < 10; epoch++)
@@ -175,17 +184,17 @@ int main()
             for (int i = 0; i < BATCH_SIZE; i++)
             {
                 idx = b * BATCH_SIZE + i;
-                y = onehot_encode(train_y[idx]);
+                y = train_y[idx];
                 x = train_X[idx];
-                forward(W, x, z, a);
+                a = forward(W, x);
                 pred = argmax(a);
                 trg = argmax(y);
-                mean_acc += static_cast<float>(int(pred == trg));
+                mean_acc += int(pred == trg);
                 mean_loss += cross_entropy(a, y) / BATCH_SIZE;
                 dW = backward(x, y, a);
                 gemm(1.f, I, dW, 1.f, dW_sum);
             }
-            gemm(-lr / BATCH_SIZE, I, dW_sum, 1.f, W);
+            gemm(-LR / BATCH_SIZE, I, dW_sum, 1.f, W);
         }
 
         std::cout << "epoch: " << epoch + 1 << "/10 "

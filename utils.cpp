@@ -87,23 +87,27 @@ void load_data(int n, int m, std::vector<std::vector<float>> &samples)
     }
 }
 
-// extract labels and replace it with 1 to use it for bias
-// samples[i]: [y, x...x] -> [1, x...x]
-// y[i]: label for samples[i]
-std::vector<float> extract_label(std::vector<std::vector<float>> &samples)
-{
-    std::vector<float> y(samples.size(), 1.f);
-    for (int i = 0; i < y.size(); i++)
-    {
-        std::swap(y[i], samples[i][0]);
-    }
-    return y;
-}
-
 std::vector<float> onehot_encode(int y)
 {
     std::vector<float> out(10, 0.f);
     out[y] = 1.f;
+    return out;
+}
+
+// extract labels and replace it with 1 to use it for bias
+// samples[i]: [y, x...x] -> [1, x...x]
+// y[i]: label for samples[i]
+// return vector of onehot encoded lables after swap
+std::vector<std::vector<float>> extract_label(std::vector<std::vector<float>> &samples)
+{
+    std::vector<float> y(samples.size(), 1.f);
+    std::vector<std::vector<float>> out;
+    for (int i = 0; i < y.size(); i++)
+    {
+        std::swap(y[i], samples[i][0]);
+        out.push_back(onehot_encode(y[i]));
+    }
+
     return out;
 }
 
