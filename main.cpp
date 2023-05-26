@@ -1,160 +1,30 @@
 #include <iostream>       // std::cout
-#include <iomanip>        // std::setw
-#include <fstream>        // std::ifstream
-#include <sstream>        // std::stringstream
-#include <string>         // std::string
 #include <vector>         // std::vector
 #include <random>         // std::random_device, std::mt19337_64, std::normal_distribution
-#include <algorithm>      // std::swap
-#include <math.h>         // log, sqrt
+#include <cmath>          // log, sqrt
 #include "naive_blas.hpp" // gemv
-
-// dataloader
-std::vector<std::vector<float>> read_csv()
-{
-    std::string line;
-    std::ifstream myfile("data/mnist_train.csv");
-    std::vector<std::vector<float>> data;
-    if (myfile.is_open())
-    {
-        getline(myfile, line);
-        while (getline(myfile, line))
-        {
-            std::stringstream ss(line);
-            std::vector<float> row;
-            while (ss.good())
-            {
-                std::string substr;
-                getline(ss, substr, ',');
-                row.push_back(std::stof(substr));
-            }
-            data.push_back(row);
-        }
-        myfile.close();
-    }
-    return data;
-}
-
-void save_bin(int n, int m, std::vector<std::vector<float>> &data)
-{
-    std::vector<float> out;
-    for (int j = 0; j < m; j++)
-    {
-        for (int i = 0; i < n; i++)
-        {
-            out.push_back(data[i][j]);
-        }
-    }
-
-    std::ofstream outfile("data/train.bin", std::ios::out | std::ios::binary);
-    if (outfile.is_open())
-    {
-        outfile.write(reinterpret_cast<const char *>(out.data()), sizeof(float) * n * m);
-        outfile.close();
-    }
-    else
-    {
-        std::cerr << "Failed to open file: data/train.bin" << std::endl;
-        throw 1;
-    }
-    data.clear();
-}
-
-void read_bin(const int &n, const int &m, std::vector<float> &out)
-{
-    // Read
-    std::ifstream input("data/train.bin", std::ios::binary);
-    if (!input)
-    {
-        std::vector<std::vector<float>> tmp = read_csv();
-        save_bin(n, m, tmp);
-    }
-
-    input.read(reinterpret_cast<char *>(out.data()), sizeof(float) * n * m);
-}
-
-void load_data(int n, int m, std::vector<std::vector<float>> &samples)
-{
-    std::vector<float> data(60000 * 785);
-    read_bin(60000, 785, data);
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < 785; j++)
-        {
-            samples[i][j] = data[i + j * 60000];
-            if (j > 0)
-            {
-                samples[i][j] /= 255;
-            }
-        }
-    }
-}
-
-// extract labels and replace it with 1 to use it for bias
-// samples[i]: [y, x...x] -> [1, x...x]
-// y[i]: label for samples[i]
-std::vector<float> extract_label(std::vector<std::vector<float>> &samples)
-{
-    std::vector<float> y(samples.size(), 1);
-    for (int i = 0; i < y.size(); i++)
-    {
-        std::swap(y[i], samples[i][0]);
-    }
-    return y;
-}
-
-std::vector<float> onehot_encode(int y)
-{
-    std::vector<float> out(10, 0);
-    out[y] = 1.f;
-    return out;
-}
-
-// utils
-template <typename T>
-void print_vector(std::vector<T> vec)
-{
-    if (vec.size() == 0)
-    {
-        std::cout << "No element in vec\n";
-        return;
-    }
-
-    std::cout << "[";
-    for (auto e : vec)
-    {
-        std::cout << e << ", ";
-    }
-    std::cout << "\b\b]\n";
-}
-
-void print_digit(std::vector<float> &sample)
-{
-    std::cout << "label: " << sample[0] << "\n";
-    for (int i = 0; i < 28; i++)
-    {
-        for (int j = 0; j < 28; j++)
-        {
-            std::cout << std::setw(3) << sample[1 + j + i * 28] << " ";
-        }
-        std::cout << "\n";
-    }
-}
+#include "utils.hpp"      // load_data, extract_label
 
 // operations
 std::vector<float> softmax(std::vector<float> x)
 {
-    std::vector<float> out(x.size(), 0);
+    std::vector<float> out(x.size(), 0.f);
+    float max = x[0];
+    for (auto e : x)
+    {
+        (e > max) ? max = e : true;
+    }
+
     const int n = x.size();
-    float expsum = 0;
+    float expsum = 0.f;
     for (int i = 0; i < n; i++)
     {
-        expsum += exp(x[i]);
+        expsum += exp(x[i] - max);
     }
 
     for (int i = 0; i < n; i++)
     {
-        out[i] = exp(x[i]) / expsum;
+        out[i] = exp(x[i] - max) / expsum;
     }
 
     return out;
@@ -162,13 +32,13 @@ std::vector<float> softmax(std::vector<float> x)
 
 float cross_entropy(std::vector<float> x, std::vector<float> y)
 {
-    float out = 0;
-    const int n = x.size();
-    for (int i = 0; i < n; i++)
+    assert(x.size() == y.size());
+
+    float out = 0.f;
+    for (int i = 0; i < x.size(); i++)
     {
         out -= y[i] * log(x[i]);
     }
-
     return out;
 }
 
@@ -183,9 +53,25 @@ void relu(std::vector<float> &x)
     }
 }
 
+int argmax(std::vector<float> &vec)
+{
+    float max = vec[0];
+    int out = 0;
+    for (int i = 0; i < vec.size(); i++)
+    {
+        if (vec[i] > max)
+        {
+            max = vec[i];
+            out = i;
+        }
+    }
+
+    return out;
+}
+
 std::vector<float> drelu(std::vector<float> &x)
 {
-    std::vector<float> out(x.size(), 0);
+    std::vector<float> out(x.size(), 0.f);
     for (int i = 0; i < x.size(); i++)
     {
         if (x[i] > 0)
@@ -197,89 +83,66 @@ std::vector<float> drelu(std::vector<float> &x)
     return out;
 }
 
-class Network
+void xavier_init(std::vector<std::vector<float>> &W)
 {
-public:
-    int dim_in;
-    int dim_out;
-    std::vector<float> _x;
-    std::vector<std::vector<float>> W;
-    std::vector<float> _z;
-    std::vector<float> _a;
+    int seed = 12;
+    // std::random_device rd;
+    // seed = rd();
+    std::mt19937_64 rng;
+    rng.seed(seed);
+    int dim_in = W[0].size();
+    int dim_out = W.size();
+    float sd = sqrt(2.f / (dim_in + dim_out));
+    std::normal_distribution<float> dist(0.f, sd);
 
-    Network(int input_dim, int output_dim) : dim_in(input_dim), dim_out(output_dim), W()
+    for (int i = 0; i < W.size(); i++)
     {
-        W.resize(dim_out);
-        for (int i = 0; i < dim_out; i++)
+        for (int j = 0; j < W[0].size(); j++)
         {
-            W[i].resize(dim_in + 1); // include bias
-        }
-
-        std::cout << "W shape(" << W.size() << ", " << W[0].size() << ")\n";
-    }
-
-    void xavier_init()
-    {
-        int seed;
-        std::random_device rd;
-        std::mt19937_64 rng;
-        seed = rd();
-        rng.seed(seed);
-        float var = sqrt(2.f / static_cast<float>(dim_in + dim_out));
-        std::normal_distribution<float> dist(0.f, var);
-
-        for (int i = 0; i < W.size(); i++)
-        {
-            for (int j = 0; j < W[0].size(); j++)
-            {
-                W[i][j] = dist(rng);
-            }
+            W[i][j] = dist(rng);
         }
     }
+}
 
-    std::vector<float> forward(std::vector<float> x)
+void forward(std::vector<std::vector<float>> W,
+             std::vector<float> x,
+             std::vector<float> &z,
+             std::vector<float> &a)
+{
+    gemv(1.f, W, x, 0.f, z);
+    a = softmax(z);
+}
+
+std::vector<std::vector<float>> backward(std::vector<float> x,
+                                         std::vector<float> y,
+                                         std::vector<float> &a)
+{
+    std::vector<float> dz = a;
+    axpy(-1.f, y, dz);
+    std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0.f));
+    for (int i = 0; i < dz.size(); i++)
     {
-        std::vector<float> out(dim_out, 0.f);
-        _x = x;
-        gemv(1.f, W, x, 0.f, out);
-        _z = out;
-        out = softmax(out);
-        _a = out;
-
-        return out;
-    }
-
-    std::vector<std::vector<float>> backward(std::vector<float> a, std::vector<float> y)
-    {
-        std::vector<float> dz;
-        axpy(-1.f, y, a);
-        dz = a;
-
-        std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0));
-        for (int i = 0; i < dz.size(); i++)
+        for (int j = 0; j < x.size(); j++)
         {
-            for (int j = 0; j < _x.size(); j++)
-            {
-                dW[i][j] = dz[i] * _x[j];
-            }
+            dW[i][j] = dz[i] * x[j];
         }
-
-        return dW;
     }
-};
+
+    return dW;
+}
 
 int main()
 {
     // Read train data in column major order
-    const int n = 10000, m = 785;
-    std::vector<std::vector<float>> samples(n, std::vector<float>(m, 0));
-    load_data(n, m, samples);
+    const int n = 60000, m = 785;
+    std::vector<std::vector<float>> train_X(n, std::vector<float>(m, 0.f));
+    load_data(n, m, train_X);
 
     std::cout << "sample shape: ("
-              << samples.size() << ", "
-              << samples[0].size() << ")\n";
+              << train_X.size() << ", "
+              << train_X[0].size() << ")\n";
 
-    std::vector<float> y = extract_label(samples);
+    std::vector<float> train_y = extract_label(train_X);
 
     std::vector<std::vector<float>> I(10, std::vector<float>(10, 0.f));
     for (int i = 0; i < 10; i++)
@@ -287,43 +150,46 @@ int main()
         I[i][i] = 1.f;
     }
 
-    Network net(784, 10);
-    net.xavier_init();
+    std::vector<std::vector<float>> W(10, std::vector<float>(785, 0.f));
+    xavier_init(W);
 
+    std::vector<float> z(W.size(), 0.f);
+    std::vector<float> a(W.size(), 0.f);
     const int BATCH_SIZE = 64;
-    const int NUM_BATCH = samples.size() / BATCH_SIZE;
-    std::vector<float> out, y_i, x_i;
-    std::vector<std::vector<float>> dW;
-    float loss, loss_mean;
-    float lr = 0.01f;
+    const int NUM_BATCH = train_X.size() / BATCH_SIZE;
+    const float lr = 0.01f;
+    std::vector<float> out, x, y;
+    std::vector<std::vector<float>> dW(10, std::vector<float>(785, 0.f));
+    float mean_loss, mean_acc;
+    int pred, trg;
 
-    int sp = 0, idx = 0;
-
+    int idx = 0;
     for (int epoch = 0; epoch < 10; epoch++)
     {
-        float loss_epoch_mean = 0;
+        mean_loss = 0.f;
+        mean_acc = 0.f;
+
         for (int b = 0; b < NUM_BATCH; b++)
         {
-            std::vector<std::vector<float>> _grad_sum(10, std::vector<float>(785, 0));
-            float loss_batch_mean = 0;
+            std::vector<std::vector<float>> dW_sum(10, std::vector<float>(785, 0.f));
             for (int i = 0; i < BATCH_SIZE; i++)
             {
                 idx = b * BATCH_SIZE + i;
-                y_i = onehot_encode(y[idx]);
-                x_i = samples[idx];
-                out = net.forward(x_i);
-                loss = cross_entropy(out, y_i);
-                loss_batch_mean += loss;
-                dW = net.backward(out, y_i);
-                gemm(1.f, I, dW, 1.f, _grad_sum);
+                y = onehot_encode(train_y[idx]);
+                x = train_X[idx];
+                forward(W, x, z, a);
+                pred = argmax(a);
+                trg = argmax(y);
+                mean_acc += static_cast<float>(int(pred == trg));
+                mean_loss += cross_entropy(a, y) / BATCH_SIZE;
+                dW = backward(x, y, a);
+                gemm(1.f, I, dW, 1.f, dW_sum);
             }
-
-            loss_batch_mean /= BATCH_SIZE;
-            loss_epoch_mean += loss_batch_mean;
-            gemm(-lr / BATCH_SIZE, I, _grad_sum, 1.f, net.W);
+            gemm(-lr / BATCH_SIZE, I, dW_sum, 1.f, W);
         }
-        loss_epoch_mean /= NUM_BATCH;
+
         std::cout << "epoch: " << epoch + 1 << "/10 "
-                  << "mean loss: " << loss_epoch_mean << std::endl;
+                  << "mean loss: " << mean_loss / (NUM_BATCH) << " "
+                  << "mean acc: " << mean_acc / (NUM_BATCH * BATCH_SIZE) << "\n";
     }
 }
