@@ -9,7 +9,7 @@ void axpy(T a, const std::vector<T> &x, std::vector<T> &y)
     if (x.size() != y.size())
     {
         std::cerr << "Error: vectors have different sizes" << std::endl;
-        return;
+        throw;
     }
 
     for (int i = 0; i < x.size(); i++)
@@ -29,12 +29,12 @@ void gemm(T a, const std::vector<std::vector<T>> &A,
     if (B.size() != p)
     {
         std::cerr << "Error: matrix dimensions A(m x p) and B(p x n) are not compatible" << std::endl;
-        return;
+        throw;
     }
     if (C.size() != m or C[0].size() != n)
     {
         std::cerr << "Error: matrix dimensions AB(m x n) and C(m x n) are not compatible" << std::endl;
-        return;
+        throw;
     }
 
     T tmp;
@@ -42,19 +42,19 @@ void gemm(T a, const std::vector<std::vector<T>> &A,
     {
         for (int j = 0; j < n; j++)
         {
-            tmp = 0;
+            tmp *= 0;
 
             for (int k = 0; k < p; k++)
             {
                 tmp += A[i][k] * B[k][j];
             }
 
-            tmp *= a;
             C[i][j] *= b;
             C[i][j] += a * tmp;
         }
     }
 }
+
 template <typename T>
 void gemv(T a, const std::vector<std::vector<T>> &A,
           const std::vector<T> &x, T b, std::vector<T> &y)
@@ -62,12 +62,12 @@ void gemv(T a, const std::vector<std::vector<T>> &A,
     if (x.size() != A[0].size())
     {
         std::cerr << "Error: matrix A(m x n) and vector x(n x 1) have different sizes" << std::endl;
-        return;
+        throw;
     }
     if (y.size() != A.size())
     {
         std::cerr << "Error: matrix Ax(m x 1) and vector y(m x 1) have different sizes" << std::endl;
-        return;
+        throw;
     }
 
     for (int i = 0; i < A.size(); i++)
